@@ -1,10 +1,14 @@
-from os import getpid, _exit
-from sys import argv
-from time import sleep
-from random import randint
+import os
+import sys
+import time
+import random
 
-s = int(argv[1])
-print('Запущена программа child в процессе с {0} - PID с аргументом {1}'.format(getpid(), s))
-sleep(s)
-print('Завершился процесс с {0} PID'.format(getpid()))
-_exit(randint(0, 1))
+s = int(sys.argv[1])
+pid = os.getpid()
+ppid = os.getppid()
+
+print(f'Child[{pid}]: I am started. My PID {pid}. Parent PID {ppid}.')
+time.sleep(s)
+print(f'Child[{pid}]: I am ended. PID {pid}. Parent PID {ppid}.')
+
+sys.exit(random.randint(0, 1))

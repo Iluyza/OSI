@@ -3,18 +3,16 @@ from sys import argv
 from random import randint
 
 n = int(argv[1])
-child = fork()
-i = 0
-while True:
+
+for i in range(n):
+    child = fork()
     if child == 0:
         number = randint(5, 10)
-        print('Сгенерированное число секунд: {0}'.format(number))
+        print(f"Parent[{getpid()}]: I ran children process with PID {getpid()}.")
         execv('/usr/bin/python3', ['python3', 'child.py', str(number)])
     else:
         ret = wait()
-        print('Дочерний процесс с PID {0} завершился. Статус завершения {1}.'.format(ret[0], ret[1]))
-        i += 1
-        if i < n:
-            child = fork()
+        if ret[1] == 0:
+            print(f"Parent[{getpid()}]: Child with PID {ret[0]} terminated. Exit Status {ret[1]}.")
         else:
-            break
+            print(f"Parent[{getpid()}]: Child with PID {ret[0]} terminated. Exit Status {ret[1]}. Starting a new child process.")

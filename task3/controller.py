@@ -1,64 +1,75 @@
-mport random
-import time
 import os
-import sys
 import signal
-from subprocess import Popen, PIPE
-
-def create_expression():
-    num1 = random.randint(1, 9)
-    operator = random.choice(['+', '-', '*', '/'])
-    num2 = random.randint(1, 9)
-    return f"{num1} {operator} {num2}"
+import sys
 
 def sigusr1_handler(signum, frame):
-    global expressions_produced
-    print(f"Produced: {expressions_produced}")
+    global produced_count
+    # Print produced_count to the stderr according to the task requirements
+    output = "Produced: " + str(produced_count) + "\n"
+    sys.stderr.write(output)
 
-def main():
-    global expressions_produced
-    expressions_produced = 0
+signal.signal(signal.SIGUSR1, sigusr1_handler)
 
-    signal.signal(signal.SIGUSR1, sigusr1_handler)
+pipe1to0 = os.pipe()
+pipe0to2 = os.pipe()
+pipe2to0 = os.pipe()
 
-    pipe1_to_0 = os.pipe()
-    pipe0_to_2 = os.pipe()
-    pipe2_to_0 = os.pipe()
+P1 = os.fork()
 
-    pid_producer = os.fork()
-    if pid_producer == 0:
-        os.close(pipe1_to_0[0])
-        os.dup2(pipe1_to_0[1], sys.stdout.fileno())
-        os.close(pipe1_to_0[1])
-        os.execlp("python3", "producer.py")
+if P1 == 0:
+    # Close unused by P1 pipes' fds
+    os.close(pipe0to2[0])
+    os.close(pipe0to2[1])
+    os.close(pipe2to0[0])
+    os.close(pipe2to0[1])
+    os.close(pipe1to0[0])
 
-    pid_calculator = os.fork()
-    if pid_calculator == 0:
-        os.close(pipe0_to_2[1])
-        os.dup2(pipe0_to_2[0], sys.stdin.fileno())
-        os.close(pipe0_to_2[0])
+    os.dup2(pipe1to0[1], sys.stdout.fileno())
+    
+    os.execve('./producer.py', ['./producer.py'], os.environ)
+   
+    os._exit(0)
 
-        os.close(pipe2_to_0[0])
-        os.dup2(pipe2_to_0[1], sys.stdout.fileno())
-        os.close(pipe2_to_0[1])
+P2 = os.fork()
 
-        os.execlp("/usr/bin/bc", "bc")
+if P2 == 0:
+    # Close unused by P2 pipes' fds
+    os.close(pipe1to0[0])
+    os.close(pipe1to0[1])
+    os.close(pipe0to2[1])
+    os.close(pipe2to0[0])
 
-    os.close(pipe1_to_0[1])
-    os.close(pipe0_to_2[0])
-    os.close(pipe2_to_0[1])
+    os.dup2(pipe0to2[0], sys.stdin.fileno())
+    os.dup2(pipe2to0[1], sys.stdout.fileno())
+    
+    os.execve('/usr/bin/bc', ['/usr/bin/bc'], os.environ)
+    
+    os._exit(0)
 
-    while True:
-        expression = os.read(pipe1_to_0[0], 100).decode("utf-8")
-        if not expression:
-            break
+# Close unused by P0 pipes' fds
+os.close(pipe1to0[1])
+os.close(pipe0to2[0])
+os.close(pipe2to0[1])
 
-        os.write(pipe0_to_2[1], expression.encode("utf-8"))
+produced_count = 0
 
-        result = os.read(pipe2_to_0[0], 100).decode("utf-8").strip()
-        print(f"{expression.strip()} = {result}")
-        expressions_produced += 1
+while True:
+    ariphmetic_expression = os.read(pipe1to0[0], 1024).decode("utf-8")
 
-    os.kill(pid_producer, signal.SIGTERM)
-    os.kill(pid_calculator, signal.SIGTERM)
-    main()
+    if not ariphmetic_expression:
+        # Send signal SIGUSR1, that will be handled by sigusr1_handler, to print number of calculated expressions by bc 
+        os.kill(os.getpid(), signal.SIGUSR1)
+        break
+    
+    os.write(pipe0to2[1], ariphmetic_expression.encode("utf-8"))
+
+    bc_result = os.read(pipe2to0[0], 1024).decode("utf-8")
+    
+    print(f"{ariphmetic_expression.strip()} = {bc_result.strip()}")
+    
+    produced_count += 1
+
+os.kill(P1, signal.SIGTERM)
+os.kill(P2, signal.SIGTERM)
+
+os._exit(0)

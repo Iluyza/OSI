@@ -1,17 +1,20 @@
 import random
 import time
+import sys
+import os
 
-def create_expression():
-    num1 = random.randint(1, 9)
-    operator = random.choice(['+', '-', '*', '/'])
-    num2 = random.randint(1, 9)
-    return f"{num1} {operator} {num2}"
+operators = ['+', '-', '*', '/']
 
-def main():
-    num_expressions = random.randint(120, 180)
+N = random.randint(120, 180)
 
-    for _ in range(num_expressions):
-        expression = create_expression()
-        print(expression)
-        time.sleep(1)
-    main()
+for _ in range(N):
+    X = random.randint(1, 9)
+    O = random.choice(operators)
+    Y = random.randint(1, 9)
+
+    print(f"{X} {O} {Y}")
+    sys.stdout.flush()
+
+    time.sleep(1)
+
+os._exit(0)
